@@ -200,9 +200,36 @@
     .stats{grid-template-columns:repeat(2,1fr);}
     .toolbar{flex-direction:column;align-items:flex-start;}
   }
+
+  #print-area{ display:none; }
+
+  @media print{
+    body *{ visibility:hidden; }
+    #print-area, #print-area *{ visibility:visible; }
+    #print-area{
+      display:block; position:absolute; left:0; top:0; width:100%; margin:0; padding:0;
+    }
+    .print-page{ page-break-after:always; padding:18px 24px; font-family:'Inter',sans-serif; }
+    .print-page:last-child{ page-break-after:auto; }
+    .print-title{
+      text-align:center; font-weight:700; font-size:15px; letter-spacing:.3px;
+      border:1px solid #000; padding:10px; margin-bottom:14px;
+    }
+    .print-title small{ display:block; font-weight:500; font-size:11px; margin-top:2px; }
+    .print-fabrica{ font-weight:700; font-size:15px; text-align:center; margin-bottom:16px; }
+    .print-meta{ font-size:12px; margin-bottom:14px; }
+    .print-meta span{ display:inline-block; border-bottom:1px solid #000; min-width:160px; margin-left:6px; }
+    table.print-table{ width:100%; border-collapse:collapse; }
+    table.print-table td, table.print-table th{
+      border:1px solid #000; font-size:11.5px; padding:3px 6px; text-align:left;
+    }
+    table.print-table th{ font-weight:700; text-align:center; background:#EEE !important; -webkit-print-color-adjust:exact; }
+    table.print-table td.pn{ text-align:center; width:26px; color:#333; }
+  }
 </style>
 </head>
 <body>
+<div id="print-area"></div>
 <div class="wrap">
 
   <header class="top">
@@ -271,7 +298,8 @@
       <div class="filemeta">Archivo: <b id="filename-out">—</b> · <span id="foliocount-out"></span></div>
       <div class="actions">
         <button class="btn btn-sm" id="btn-reset">Subir otro archivo</button>
-        <button class="btn btn-primary btn-sm" id="btn-export">Descargar Excel (formato original)</button>
+        <button class="btn btn-sm" id="btn-export-xlsx" title="Excel editable, por si lo necesitas">Excel editable</button>
+        <button class="btn btn-primary btn-sm" id="btn-export-pdf">Descargar PDF (listo para imprimir)</button>
       </div>
     </div>
 
@@ -398,7 +426,8 @@
     if(e.target.files[0]) handleFile(e.target.files[0]);
   });
   document.getElementById('btn-reset').addEventListener('click', resetApp);
-  document.getElementById('btn-export').addEventListener('click', exportExcel);
+  document.getElementById('btn-export-xlsx').addEventListener('click', exportExcel);
+  document.getElementById('btn-export-pdf').addEventListener('click', exportPDF);
   searchInput.addEventListener('input', renderTable);
 
   function showError(msg){
@@ -883,7 +912,7 @@
   }
 
   async function exportExcel(){
-    const btn = document.getElementById('btn-export');
+    const btn = document.getElementById('btn-export-xlsx');
     const originalLabel = btn.textContent;
     btn.textContent = 'Generando...';
     btn.disabled = true;
@@ -942,6 +971,61 @@
     }finally{
       btn.textContent = originalLabel;
       btn.disabled = false;
+    }
+  }
+
+  function exportPDF(){
+    const btn = document.getElementById('btn-export-pdf');
+    const originalLabel = btn.textContent;
+    try{
+      const printArea = document.getElementById('print-area');
+      printArea.innerHTML = '';
+      const hoy = new Date().toLocaleDateString('es-MX');
+      let huboContenido = false;
+
+      ['K','Q','A','OI','SERVICIOS'].forEach(code=>{
+        const folios = (grouped[code] || []).map(r=>r.folio);
+        if(!folios.length) return;
+        huboContenido = true;
+
+        const cols = 3;
+        const perCol = Math.ceil(folios.length / cols);
+        const columnas = [[],[],[]];
+        folios.forEach((f, i)=> columnas[Math.floor(i / perCol)].push(f));
+
+        const maxRows = Math.max(...columnas.map(c=>c.length));
+        let filas = '';
+        for(let r = 0; r < maxRows; r++){
+          filas += '<tr>';
+          for(let c = 0; c < cols; c++){
+            const idxGlobal = c * perCol + r;
+            const val = columnas[c][r];
+            filas += '<td class="pn">' + (val !== undefined ? (idxGlobal + 1) : '') + '</td>';
+            filas += '<td>' + (val !== undefined ? esc(val) : '') + '</td>';
+          }
+          filas += '</tr>';
+        }
+
+        const page = document.createElement('div');
+        page.className = 'print-page';
+        page.innerHTML =
+          '<div class="print-title">DEPARTAMENTO DE LOGÍSTICA Y EMBARQUES<small>FORMATO DE PEDIDOS FIRMADOS — KASSEL HOME &amp; LIVING</small></div>' +
+          '<div class="print-fabrica">' + esc(CATS[code].label.toUpperCase()) + ' — ' + esc(CATS[code].desc) + '</div>' +
+          '<div class="print-meta">Fecha de impresión: <span>' + esc(hoy) + '</span> &nbsp;&nbsp; Total de pedidos: <span>' + folios.length + '</span></div>' +
+          '<table class="print-table"><thead><tr><th>No.</th><th>PEDIDO</th><th>No.</th><th>PEDIDO</th><th>No.</th><th>PEDIDO</th></tr></thead>' +
+          '<tbody>' + filas + '</tbody></table>';
+        printArea.appendChild(page);
+      });
+
+      if(!huboContenido){
+        showError('No hay pedidos clasificados todavía para generar el PDF.');
+        return;
+      }
+      clearError();
+      setTimeout(()=>window.print(), 80);
+    }catch(err){
+      console.error(err);
+      showError('No se pudo preparar el PDF. Detalle: ' + err.message);
     }
   }
 
