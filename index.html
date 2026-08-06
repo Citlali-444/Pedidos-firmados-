@@ -441,7 +441,7 @@
 
   function handleFile(file){
     clearError();
-    fileLabel = file.name;
+    fileLabel = file.name.replace(/\.[^/.]+$/, '');
     const reader = new FileReader();
     reader.onload = function(e){
       try{
@@ -705,6 +705,7 @@
 
     clearError();
     const files = Array.from(fileList);
+    fileLabel = files.map(f=>f.name.replace(/\.[^/.]+$/, '')).join(', ');
     ocrProgress.style.display = 'block';
     ocrReview.style.display = 'block';
 
@@ -1011,7 +1012,7 @@
         page.innerHTML =
           '<div class="print-title">DEPARTAMENTO DE LOGÍSTICA Y EMBARQUES<small>FORMATO DE PEDIDOS FIRMADOS — KASSEL HOME &amp; LIVING</small></div>' +
           '<div class="print-fabrica">' + esc(CATS[code].label.toUpperCase()) + ' — ' + esc(CATS[code].desc) + '</div>' +
-          '<div class="print-meta">Fecha de impresión: <span>' + esc(hoy) + '</span> &nbsp;&nbsp; Total de pedidos: <span>' + folios.length + '</span></div>' +
+          '<div class="print-meta">Firmados del día: <span>' + esc(fileLabel || hoy) + '</span> &nbsp;&nbsp; Total de pedidos: <span>' + folios.length + '</span></div>' +
           '<table class="print-table"><thead><tr><th>No.</th><th>PEDIDO</th><th>No.</th><th>PEDIDO</th><th>No.</th><th>PEDIDO</th></tr></thead>' +
           '<tbody>' + filas + '</tbody></table>';
         printArea.appendChild(page);
